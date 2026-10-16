@@ -485,6 +485,96 @@ async function handle(request: Request, origin?: string) {
     }, 201, origin);
   }
 
+  const allianceErrors: Record<string, [number, string]> = {
+    already_member: [409, "Leave your current alliance first."],
+    name_taken: [409, "That alliance name is already taken."],
+    not_found: [404, "Alliance not found."],
+    full: [409, "This alliance is full (128 members maximum)."],
+    not_member: [404, "You are not in an alliance."],
+  };
+  const mapAlliance = (row: Record<string, unknown>) => ({
+    id: row.id, name: row.name, ownerId: row.owner_id, createdAt: row.created_at,
+    memberCount: Number(row.member_count ?? 0), maxMembers: 128,
+  });
+  const currentAlliance = async (uid: string) => {
+    const { data: membership, error } = await db.from("alliance_members")
+      .select("alliance_id").eq("user_id", uid).maybeSingle();
+    if (error) throw error;
+    if (!membership) return { alliance: null, members: [] };
+    const { data, error: allianceError } = await db.from("alliances")
+      .select("id, name, owner_id, created_at, alliance_members(count)")
+      .eq("id", membership.alliance_id).maybeSingle();
+    if (allianceError) throw allianceError;
+    const { data: members, error: membersError } = await db.from("alliance_members")
+      .select("user_id, joined_at, users!alliance_members_user_id_fkey(username)")
+      .eq("alliance_id", membership.alliance_id)
+      .order("joined_at").order("user_id");
+    if (membersError) throw membersError;
+    return {
+      alliance: data ? mapAlliance({ ...data, member_count: data.alliance_members?.[0]?.count }) : null,
+      members: members.map((row) => ({
+        userId: row.user_id, username: row.users.username, joinedAt: row.joined_at,
+      })),
+    };
+  };
+  const allianceStatus = (status: string) => {
+    const [code, error] = allianceErrors[status] || [500, "The server could not complete that request."];
+    return json({ error }, code, origin);
+  };
+
+  if (endpoint === "/alliances" && method === "GET") {
+    if (!currentUser) return json({ error: "Sign in to continue." }, 401, origin);
+    const query = (url.searchParams.get("query") || "").trim().slice(0, 32);
+    const { data, error } = await db.rpc("list_alliances", { p_query: query || null, p_limit: 50 });
+    if (error) throw error;
+    return json({ alliances: data.map(mapAlliance) }, 200, origin);
+  }
+
+  if (endpoint === "/alliances/me" && method === "GET") {
+    if (!currentUser) return json({ error: "Sign in to continue." }, 401, origin);
+    return json(await currentAlliance(currentUser), 200, origin);
+  }
+
+  if (endpoint === "/alliances" && method === "POST") {
+    if (!currentUser) return json({ error: "Sign in to continue." }, 401, origin);
+    const body = await requestBody(request);
+    if (!body) return json({ error: "Request body must be a JSON object." }, 400, origin);
+    const validationError = cleanText(body.name, 32, "Alliance name", 3);
+    if (validationError) return json({ error: validationError }, 400, origin);
+    const name = (body.name as string).trim();
+    if (!/^[a-zA-Z0-9 _-]+$/.test(name)) {
+      return json({
+        error: "Alliance name can only contain letters, numbers, spaces, underscores, and hyphens.",
+      }, 400, origin);
+    }
+    const { data, error } = await db.rpc("create_alliance", {
+      p_id: crypto.randomUUID(), p_user_id: currentUser, p_name: name,
+    });
+    if (error) throw error;
+    if (data !== "ok") return allianceStatus(data);
+    return json(await currentAlliance(currentUser), 201, origin);
+  }
+
+  if (endpoint === "/alliances/leave" && method === "POST") {
+    if (!currentUser) return json({ error: "Sign in to continue." }, 401, origin);
+    const { data, error } = await db.rpc("leave_alliance", { p_user_id: currentUser });
+    if (error) throw error;
+    if (data !== "ok") return allianceStatus(data);
+    return json({ alliance: null, members: [] }, 200, origin);
+  }
+
+  const joinMatch = endpoint.match(/^\/alliances\/([^/]+)\/join$/);
+  if (joinMatch && method === "POST") {
+    if (!currentUser) return json({ error: "Sign in to continue." }, 401, origin);
+    if (!uuidPattern.test(joinMatch[1])) return json({ error: "Alliance not found." }, 404, origin);
+    const { data, error } = await db.rpc("join_alliance", {
+      p_alliance_id: joinMatch[1], p_user_id: currentUser,
+    });
+    if (error) throw error;
+    if (data !== "ok") return allianceStatus(data);
+    return json(await currentAlliance(currentUser), 200, origin);
+  }
+
   return json({ error: "Not found." }, 404, origin);
 }
 

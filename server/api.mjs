@@ -473,6 +473,92 @@ export function createApi({ client = getSupabaseClient() } = {}) {
     }
   })
 
+  const allianceErrors = {
+    already_member: [409, 'Leave your current alliance first.'],
+    name_taken: [409, 'That alliance name is already taken.'],
+    not_found: [404, 'Alliance not found.'],
+    full: [409, 'This alliance is full (128 members maximum).'],
+    not_member: [404, 'You are not in an alliance.'],
+  }
+
+  async function currentAllianceResponse(userId) {
+    const alliance = await store.getUserAlliance(userId)
+    return { alliance, members: alliance ? await store.listAllianceMembers(alliance.id) : [] }
+  }
+
+  app.get('/api/alliances', requireAuth, async (req, res, next) => {
+    try {
+      const query = typeof req.query.query === 'string' ? req.query.query.trim().slice(0, 32) : ''
+      res.json({ alliances: await store.listAlliances(query) })
+    } catch (error) {
+      next(error)
+    }
+  })
+
+  app.get('/api/alliances/me', requireAuth, async (req, res, next) => {
+    try {
+      res.json(await currentAllianceResponse(req.session.userId))
+    } catch (error) {
+      next(error)
+    }
+  })
+
+  app.post('/api/alliances', requireAuth, async (req, res, next) => {
+    try {
+      const validationError = cleanText(req.body.name, 32, 'Alliance name', 3)
+      if (validationError) {
+        res.status(400).json({ error: validationError })
+        return
+      }
+      const name = req.body.name.trim()
+      if (!/^[a-zA-Z0-9 _-]+$/.test(name)) {
+        res.status(400).json({ error: 'Alliance name can only contain letters, numbers, spaces, underscores, and hyphens.' })
+        return
+      }
+      const status = await store.createAlliance({ id: randomUUID(), userId: req.session.userId, name })
+      if (status !== 'ok') {
+        const [code, error] = allianceErrors[status] || [500, 'The server could not complete that request.']
+        res.status(code).json({ error })
+        return
+      }
+      res.status(201).json(await currentAllianceResponse(req.session.userId))
+    } catch (error) {
+      next(error)
+    }
+  })
+
+  app.post('/api/alliances/leave', requireAuth, async (req, res, next) => {
+    try {
+      const status = await store.leaveAlliance(req.session.userId)
+      if (status !== 'ok') {
+        const [code, error] = allianceErrors[status] || [500, 'The server could not complete that request.']
+        res.status(code).json({ error })
+        return
+      }
+      res.json({ alliance: null, members: [] })
+    } catch (error) {
+      next(error)
+    }
+  })
+
+  app.post('/api/alliances/:id/join', requireAuth, async (req, res, next) => {
+    try {
+      if (!UUID_PATTERN.test(req.params.id)) {
+        res.status(404).json({ error: 'Alliance not found.' })
+        return
+      }
+      const status = await store.joinAlliance(req.params.id, req.session.userId)
+      if (status !== 'ok') {
+        const [code, error] = allianceErrors[status] || [500, 'The server could not complete that request.']
+        res.status(code).json({ error })
+        return
+      }
+      res.json(await currentAllianceResponse(req.session.userId))
+    } catch (error) {
+      next(error)
+    }
+  })
+
   app.use(sendUnexpectedError)
 
   return {

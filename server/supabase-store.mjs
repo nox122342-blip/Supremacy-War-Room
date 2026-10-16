@@ -59,6 +59,19 @@ function mapMessage(row) {
   }
 }
 
+export const ALLIANCE_MAX_MEMBERS = 128
+
+function mapAlliance(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    ownerId: row.owner_id,
+    createdAt: row.created_at,
+    memberCount: Number(row.member_count ?? 0),
+    maxMembers: ALLIANCE_MAX_MEMBERS,
+  }
+}
+
 export function createSupabaseStore(client) {
   return {
     async getUser(id) {
@@ -272,6 +285,58 @@ export function createSupabaseStore(client) {
         .single()
       if (error) throw error
       return mapMessage(data)
+    },
+
+    async listAlliances(query) {
+      const { data, error } = await client.rpc('list_alliances', { p_query: query || null, p_limit: 50 })
+      if (error) throw error
+      return data.map(mapAlliance)
+    },
+
+    async getAlliance(id) {
+      const { data, error } = await client.from('alliances')
+        .select('id, name, owner_id, created_at, alliance_members(count)')
+        .eq('id', id)
+        .maybeSingle()
+      if (error) throw error
+      return data ? mapAlliance({ ...data, member_count: data.alliance_members?.[0]?.count }) : null
+    },
+
+    async getUserAlliance(userId) {
+      const { data, error } = await client.from('alliance_members')
+        .select('alliance_id')
+        .eq('user_id', userId)
+        .maybeSingle()
+      if (error) throw error
+      return data ? this.getAlliance(data.alliance_id) : null
+    },
+
+    async listAllianceMembers(allianceId) {
+      const { data, error } = await client.from('alliance_members')
+        .select('user_id, joined_at, users!alliance_members_user_id_fkey(username)')
+        .eq('alliance_id', allianceId)
+        .order('joined_at', { ascending: true })
+        .order('user_id', { ascending: true })
+      if (error) throw error
+      return data.map((row) => ({ userId: row.user_id, username: row.users.username, joinedAt: row.joined_at }))
+    },
+
+    async createAlliance({ id, userId, name }) {
+      const { data, error } = await client.rpc('create_alliance', { p_id: id, p_user_id: userId, p_name: name })
+      if (error) throw error
+      return data
+    },
+
+    async joinAlliance(allianceId, userId) {
+      const { data, error } = await client.rpc('join_alliance', { p_alliance_id: allianceId, p_user_id: userId })
+      if (error) throw error
+      return data
+    },
+
+    async leaveAlliance(userId) {
+      const { data, error } = await client.rpc('leave_alliance', { p_user_id: userId })
+      if (error) throw error
+      return data
     },
   }
 }

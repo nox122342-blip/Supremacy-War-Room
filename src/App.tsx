@@ -55,6 +55,18 @@ type Message = {
   createdAt: string
 }
 
+type Alliance = {
+  id: string
+  name: string
+  ownerId: string
+  createdAt: string
+  memberCount: number
+  maxMembers: number
+}
+
+type AllianceMember = { userId: string; username: string; joinedAt: string }
+type AllianceState = { alliance: Alliance | null; members: AllianceMember[] }
+
 type Conversation = {
   userId: string
   username: string
@@ -406,6 +418,12 @@ function App() {
   const [commentsByStrategy, setCommentsByStrategy] = useState<Record<string, Comment[]>>({})
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({})
   const [messagesOpen, setMessagesOpen] = useState(false)
+  const [alliancesOpen, setAlliancesOpen] = useState(false)
+  const [myAlliance, setMyAlliance] = useState<Alliance | null>(null)
+  const [allianceMembers, setAllianceMembers] = useState<AllianceMember[]>([])
+  const [allianceResults, setAllianceResults] = useState<Alliance[]>([])
+  const [allianceQuery, setAllianceQuery] = useState('')
+  const [allianceName, setAllianceName] = useState('')
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [activeConversation, setActiveConversation] = useState<User | null>(null)
   const [conversationMessages, setConversationMessages] = useState<Message[]>([])
@@ -587,6 +605,41 @@ function App() {
       .then(({ conversations: nextConversations }) => setConversations(nextConversations))
       .catch((requestError: unknown) => setError(requestError instanceof Error ? requestError.message : 'Could not load messages.'))
   }, [messagesOpen, user])
+
+  useEffect(() => {
+    if (!user || !alliancesOpen) return
+    const timer = window.setTimeout(() => {
+      Promise.all([
+        api<AllianceState>('/alliances/me'),
+        api<{ alliances: Alliance[] }>(`/alliances?query=${encodeURIComponent(allianceQuery.trim())}`),
+      ])
+        .then(([mine, list]) => {
+          setMyAlliance(mine.alliance)
+          setAllianceMembers(mine.members)
+          setAllianceResults(list.alliances)
+        })
+        .catch((requestError: unknown) => setError(requestError instanceof Error ? requestError.message : 'Could not load alliances.'))
+    }, 250)
+    return () => window.clearTimeout(timer)
+  }, [alliancesOpen, allianceQuery, user, myAlliance?.id])
+
+  const applyAllianceState = (state: AllianceState) => {
+    setMyAlliance(state.alliance)
+    setAllianceMembers(state.members)
+  }
+
+  const runAllianceAction = async (path: string, body?: unknown) => {
+    setError('')
+    try {
+      applyAllianceState(await api<AllianceState>(path, {
+        method: 'POST',
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      }))
+      setAllianceName('')
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Alliance request failed.')
+    }
+  }
 
   useEffect(() => {
     if (!highPriorityOpen) return
@@ -969,6 +1022,11 @@ function App() {
               }
             }}>
               Messages
+            </button>
+          ) : null}
+          {user && !offlineMode ? (
+            <button className="ghost-button" type="button" onClick={() => setAlliancesOpen((open) => !open)}>
+              Alliances
             </button>
           ) : null}
           {user || offlineMode ? (
@@ -1489,6 +1547,53 @@ function App() {
         </main>
 
         <aside className="side-panel">
+          {alliancesOpen && user ? (
+            <section className="panel messages-panel">
+              <div className="panel-header">
+                <h3>Alliances</h3>
+                <button type="button" className="close-button" aria-label="Close alliances" onClick={() => setAlliancesOpen(false)}>✕</button>
+              </div>
+              {myAlliance ? (
+                <div className="active-chat">
+                  <h4>{myAlliance.name}</h4>
+                  <p className="muted-copy">{myAlliance.memberCount} / {myAlliance.maxMembers} members</p>
+                  <div className="conversation-list">
+                    {allianceMembers.map((member) => (
+                      <p key={member.userId} className="muted-copy">
+                        <strong>{member.username}</strong>{member.userId === myAlliance.ownerId ? ' (leader)' : ''}
+                      </p>
+                    ))}
+                  </div>
+                  <button className="ghost-button wide-button" type="button" onClick={() => runAllianceAction('/alliances/leave')}>Leave alliance</button>
+                </div>
+              ) : (
+                <>
+                  <form className="message-form" onSubmit={(event) => { event.preventDefault(); runAllianceAction('/alliances', { name: allianceName }) }}>
+                    <label className="search-field">
+                      <span>Create an alliance</span>
+                      <input required minLength={3} maxLength={32} value={allianceName} onChange={(event) => setAllianceName(event.target.value)} placeholder="Alliance name" />
+                    </label>
+                    <button className="primary-button wide-button" type="submit">Create alliance</button>
+                  </form>
+                  <label className="search-field">
+                    <span>Find an alliance to join</span>
+                    <input maxLength={32} value={allianceQuery} onChange={(event) => setAllianceQuery(event.target.value)} placeholder="Search alliances" />
+                  </label>
+                  <div className="conversation-list">
+                    {allianceResults.map((alliance) => {
+                      const full = alliance.memberCount >= alliance.maxMembers
+                      return (
+                        <button key={alliance.id} type="button" className="conversation-button" disabled={full} onClick={() => runAllianceAction(`/alliances/${alliance.id}/join`)}>
+                          <span><strong>{alliance.name}</strong><small>{alliance.memberCount} / {alliance.maxMembers} members{full ? ' · Full' : ''}</small></span>
+                        </button>
+                      )
+                    })}
+                    {!allianceResults.length ? <p className="muted-copy">No alliances found.</p> : null}
+                  </div>
+                </>
+              )}
+            </section>
+          ) : null}
           {messagesOpen && user ? (
             <section className="panel messages-panel">
               <div className="panel-header">
