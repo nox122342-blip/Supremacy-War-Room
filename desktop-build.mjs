@@ -36,6 +36,6 @@ if (!installerName) throw new Error(`Windows installer was not produced in ${ext
 
 await mkdir(projectOutput, { recursive: true })
 const installerPath = join(externalOutput, installerName)
-const deliveredInstaller = join(projectOutput, 'Supremacy War Room Setup.exe')
+const deliveredInstaller = join(projectOutput, 'Supremacy War Room Full Setup.exe')
 await copyFile(installerPath, deliveredInstaller)
-console.log(`Windows installer created: ${deliveredInstaller}`)
+console.log(`Full Windows installer created: ${deliveredInstaller}`)
