@@ -18,6 +18,8 @@ const result = spawnSync(
     'node_modules/electron-builder/cli.js',
     '--win',
     'nsis',
+    '--publish',
+    'never',
     `--config.directories.output=${externalOutput}`,
   ],
   { cwd: projectRoot, stdio: 'inherit' },
