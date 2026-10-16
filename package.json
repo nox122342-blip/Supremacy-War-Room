@@ -1,7 +1,7 @@
 {
   "name": "supremacy-strategy-app",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Strategy sharing and command planning for Supremacy: World War 3.",
   "author": "Supremacy War Room",
   "type": "module",
@@ -17,7 +17,7 @@
     "android:sync": "npm run build && cap sync android",
     "android:apk": "node android-build.mjs",
     "android:release": "node android-build.mjs --release",
-    "desktop:exe": "npm run build && node desktop-build.mjs",
+    "desktop:exe": "npm run build && node desktop-build.mjs && node scripts/build-desktop-bootstrapper.mjs",
     "lint": "oxlint",
     "preview": "vite preview"
   },
