@@ -13,7 +13,7 @@ npm install
 npm run dev
 ```
 
-The app is served at `http://localhost:5173`. The development launcher also starts the API on port `3001`; Vite proxies `/api` requests to it. Account data, strategies, comments, messages, and sessions are stored in Supabase.
+The app is served at `http://localhost:5173`. The development launcher also starts the API on port `3001`; Vite proxies `/api` requests to it. Account data, strategies, comments, messages, and sessions are stored in Supabase. Production web, Android, and Windows builds use the public Supabase Edge API by default; users can still override the API from the app's **Server URL** setting. The public web client is hosted on GitHub Pages and the API uses Supabase's free Edge Functions tier; no paid server is required.
 
 The existing local SQLite files are left untouched and are not imported into Supabase. The app keeps its current bcrypt-password and Express-session authentication; credentials and all database operations stay behind the API. Supabase row-level security is enabled, and only the server's service-role key can access application tables.
 
@@ -29,7 +29,7 @@ The interface combines a subtle animated, perspective tactical grid with the Gho
 
 ## Set up a hosted API
 
-The API can run in Docker and use the Supabase project configured in `.env`:
+The API can also run locally in Docker for development or self-hosting, using the Supabase project configured in `.env`. The public app already uses the Supabase Edge Function API and does not need a separate server:
 
 1. Install and start [Docker Desktop](https://www.docker.com/products/docker-desktop/).
 2. Copy `.env.example` to `.env` and set `SUPABASE_SERVICE_ROLE_KEY` to the server-only key from Supabase. Keep the key private.
@@ -39,7 +39,7 @@ The API can run in Docker and use the Supabase project configured in `.env`:
 
 `npm run api:logs` follows API logs; `npm run api:stop` stops the container. To start it again, run `docker compose up -d`.
 
-For public use, put the API behind an HTTPS reverse proxy and configure that proxy to forward requests to port `3001`. The API uses secure session cookies in production, so sign-in requires HTTPS. Set `CORS_ORIGINS` in the generated `.env` to the exact origins of any hosted web clients, separated by commas, then restart with `docker compose up -d`. The installed Android and Windows apps can connect through **Server** settings; allow `https://localhost` and `supremacy://app` as origins (already allowed by the API). Keep `.env` private; it contains the session signing secret and Supabase service-role key.
+For self-hosting, put the API behind an HTTPS reverse proxy and configure it to forward requests to port `3001`. The Express API uses secure session cookies in production, so sign-in requires HTTPS. Set `CORS_ORIGINS` in the generated `.env` to the exact origins of any hosted clients, separated by commas. Keep `.env` private; it contains the session signing secret and Supabase service-role key.
 
 To run the production client build:
 
@@ -50,18 +50,20 @@ npm run preview
 
 ## Installable apps
 
-Both native apps include the client; accounts, strategies, and messages still live on the API server. Deploy the API on HTTPS first, configure its `CORS_ORIGINS` to allow `https://localhost` and `supremacy://app` (plus any hosted website origin), then enter the API's HTTPS base address from the **Server** button in the installed app. API cookies are only secure in production mode.
+Both native apps include the client; accounts, strategies, and messages live in Supabase. Public Android and Windows builds connect to the Supabase Edge Function API automatically and use bearer-token sessions, so users do not need to deploy or configure a server. The app's **Server URL** setting remains available for a self-hosted API. The Edge Function allows the GitHub Pages, Capacitor Android, and Electron origins by default.
 
 - Windows installer: `npm run desktop:exe` creates `release/Supremacy War Room Setup.exe`, a bootstrapper under 25 MB that downloads the full installer from the latest GitHub Release and verifies its SHA-256 digest before launching it. An internet connection is required. Each published GitHub Release must include both `Supremacy War Room Setup.exe` and `Supremacy War Room Full Setup.exe`; the latter is the full offline installer. Build staging is kept outside synchronized Documents folders before the files are copied into the project.
 - Android APK: install JDK 21 and Android SDK Platform 36 plus build tools. `npm run android:apk` detects the standard Windows Android SDK / Temurin JDK locations, builds, then copies the installable debug APK to `release/Supremacy War Room.apk`.
 
-### Publish updates for other devices
+### Public web app and publish updates for other devices
 
-The GitHub Actions workflow `.github/workflows/release.yml` builds the Windows installer, a signed Android APK, and the API's Docker image, then publishes the installers to a GitHub Release and the image to GitHub Container Registry (`ghcr.io`). Share the repository's **Releases** page (or its `/releases/latest` URL); users can download the newest assets there. Windows users run the new installer over the existing app. Android users install the downloaded APK over the existing app; Android may ask them to allow installs from their browser or file manager.
+The GitHub Pages workflow `.github/workflows/pages.yml` publishes the web client at `https://nox122342-blip.github.io/Supremacy-War-Room/`. The Supabase Edge Function serves the API at `https://ckgkfvylkaiyladbxqfp.supabase.co/functions/v1/api`. Both are on free tiers subject to their providers' usage limits.
 
-The API image can be started on a Docker host after supplying `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and a randomly generated `SESSION_SECRET` through that host's private environment. This publishes the backend image but does not provision or deploy a public API host; configure the installed app's **Server URL** with the HTTPS address of the host you deploy it to.
+The GitHub Actions workflow `.github/workflows/release.yml` builds the Windows installer, a signed Android APK, and an optional Docker API image, then publishes installers to a GitHub Release and the image to GitHub Container Registry (`ghcr.io`). Share the repository's **Releases** page (or its `/releases/latest` URL); users can download the newest assets there. Windows users run the new installer over the existing app. Android users install the downloaded APK over the existing app; Android may ask them to allow installs from their browser or file manager.
 
-Before the first release, create one Android release keystore and keep a secure backup. Never commit or share this file. Add these GitHub repository Actions secrets:
+The public web client and production Windows/Android builds send API requests directly to the Supabase Edge Function using short-lived server-stored bearer sessions. The Supabase service-role key is only used by the Edge Function and never included in app builds. Native users can change the API address from **Server URL** settings if they run a separate backend.
+
+The Android release signing key is configured in GitHub Actions. Keep a secure backup of the same keystore; losing it prevents existing Android users from installing future APK updates. Never commit or share the keystore. The workflow uses these repository Actions secrets:
 
 - `ANDROID_KEYSTORE_BASE64`: output of `[Convert]::ToBase64String([IO.File]::ReadAllBytes("supremacy-release.keystore"))` in PowerShell.
 - `ANDROID_KEYSTORE_PASSWORD`: keystore password.
@@ -70,18 +72,18 @@ Before the first release, create one Android release keystore and keep a secure 
 
 Create the keystore with `keytool -genkeypair -v -keystore supremacy-release.keystore -alias supremacy -keyalg RSA -keysize 2048 -validity 10000`. Losing this key prevents Android users from installing future APK updates over this release.
 
-To publish a release, increment `version` in `package.json` (and the matching root version in `package-lock.json`), commit the change, and push a matching version tag, for example `v1.0.1`. The workflow rejects a tag that does not match the package version. The Android version name and monotonically increasing version code are derived from that version. Signed local builds can be made with `npm run android:release` after setting `ANDROID_KEYSTORE_FILE`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`; the APK is written to `release/Supremacy War Room Release.apk`.
+To publish a release, increment `version` in `package.json` (and the matching root version in `package-lock.json`), push the commit to `main` to update GitHub Pages, then push a matching version tag such as `v1.0.7`. The workflows reject a tag that does not match the package version. The Android version name and monotonically increasing version code are derived from that version. Signed local builds can be made with `npm run android:release` after setting `ANDROID_KEYSTORE_FILE`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`; the APK is written to `release/Supremacy War Room Release.apk`.
 
-The existing sideloadable APK from `npm run android:apk` is debug-signed, so it cannot be upgraded directly to a release-signed APK. Devices with that debug build must uninstall it before installing the first published release; this removes device-local offline drafts. From the first release onward, keep using the same release keystore and users can install later APKs as upgrades without uninstalling.
+The existing sideloadable APK from `npm run android:apk` is debug-signed, so it cannot be upgraded directly to a release-signed APK. Devices with that debug build must uninstall it before installing the first published release; this removes device-local offline drafts. The published v1.0.6 release is signed, and subsequent releases must keep using the same release keystore so users can install updates without uninstalling.
 
-For a deployed setup, run the API with `NODE_ENV=production`, set `SESSION_SECRET` to a cryptographically random value of at least 32 characters, and provide `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` to the server through its private environment. Serve the client and API from the same HTTPS origin.
+For a self-hosted deployment, run the Express API with `NODE_ENV=production`, set `SESSION_SECRET` to a cryptographically random value of at least 32 characters, and provide `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` through the server's private environment. This is optional; it is not needed for the public GitHub Pages and Supabase Edge Function deployment.
 
 ## Features
 
 - Public strategy feed with search and category filters.
 - Choose a theatre for each strategy; the theatre is saved and used to place it on the map.
 - A high-priority tab above the command-feed search box opens a dedicated targets window, with up to 10 targets per account.
-- Account registration and sign-in, with bcrypt password hashes in Supabase and HTTP-only, same-site session cookies stored in Supabase.
+- Account registration and sign-in, with bcrypt password hashes in Supabase and server-validated sessions (HTTP-only cookies in Express mode and bearer tokens in Edge Function mode).
 - Authenticated strategy publishing and comments.
 - Private one-to-one messages between registered accounts.
 - Validation and authentication on the API, not only in the client.

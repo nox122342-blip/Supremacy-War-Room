@@ -284,7 +284,7 @@ function SpinningGlobeMap() {
       updateAnimation()
     }
     image.onerror = () => console.error('Could not load the globe map texture.')
-    image.src = '/globe-map.svg'
+    image.src = `${import.meta.env.BASE_URL}globe-map.svg`
 
     return () => {
       disposed = true
@@ -331,15 +331,19 @@ function readLocalList<T>(key: string): T[] {
 
 function getApiUrl() {
   const configuredUrl = localStorage.getItem('supremacy.apiUrl')?.trim()
-  return configuredUrl ? `${configuredUrl.replace(/\/+$/, '')}/api` : '/api'
+  if (configuredUrl) return `${configuredUrl.replace(/\/+$/, '')}/api`
+  const publicApiUrl = import.meta.env.VITE_API_URL?.trim() ||
+    (import.meta.env.PROD ? 'https://ckgkfvylkaiyladbxqfp.supabase.co/functions/v1' : '')
+  return publicApiUrl ? `${publicApiUrl.replace(/\/+$/, '')}/api` : '/api'
 }
 
 async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const accessToken = localStorage.getItem('supremacy.accessToken')
   const response = await fetch(`${getApiUrl()}${path}`, {
     ...options,
-    credentials: 'include',
     headers: {
       ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       ...options.headers,
     },
   })
@@ -347,8 +351,11 @@ async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
     const result = (await response.json().catch(() => null)) as { error?: string } | null
     throw new Error(result?.error || `Request failed (${response.status}).`)
   }
+  if (path === '/auth/logout') localStorage.removeItem('supremacy.accessToken')
   if (response.status === 204) return undefined as T
-  return (await response.json()) as T
+  const result = (await response.json()) as T & { accessToken?: string }
+  if (result.accessToken) localStorage.setItem('supremacy.accessToken', result.accessToken)
+  return result
 }
 
 function formatDate(value: string) {
@@ -1310,7 +1317,7 @@ function App() {
                 <div className="map-viewport" aria-label="World strategy map">
                   <svg viewBox="0 0 1000 500" role="img" aria-labelledby="map-title">
                     <title id="map-title">Strategic theatre map</title>
-                    <image href="/globe-map.svg" x="0" y="0" width="1000" height="500" preserveAspectRatio="xMidYMid meet" opacity="0.96" />
+                    <image href={`${import.meta.env.BASE_URL}globe-map.svg`} x="0" y="0" width="1000" height="500" preserveAspectRatio="xMidYMid meet" opacity="0.96" />
                     {mapRegions.map((region) => {
                       const isActive = selectedMapRegion === 'All' || selectedMapRegion === region.id
                       return (

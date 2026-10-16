@@ -73,7 +73,7 @@
   background:
     repeating-linear-gradient(0deg, rgba(202, 252, 255, 0.3) 0 1px, transparent 1px 4px),
     linear-gradient(115deg, rgba(62, 246, 255, 0.28), transparent 48%, rgba(196, 137, 255, 0.3));
-  mask: url('/ghost-family-logo.png') center / 100% 100% no-repeat;
+  mask: url('../ghost-family-logo.png') center / 100% 100% no-repeat;
   opacity: 0.72;
   animation: hologram-flicker 5.2s ease-in-out infinite;
   pointer-events: none;
@@ -84,7 +84,7 @@
   inset: 0;
   z-index: 0;
   content: '';
-  background: url('/ghost-family-logo.png') center / contain no-repeat;
+  background: url('../ghost-family-logo.png') center / contain no-repeat;
   opacity: 0.3;
   pointer-events: none;
 }
@@ -132,7 +132,7 @@
 .globe-map-fallback {
   position: absolute;
   inset: 0;
-  background: url('/globe-map.svg') center / 200% 100% no-repeat;
+  background: url('../globe-map.svg') center / 200% 100% no-repeat;
 }
 
 .globe-grid {

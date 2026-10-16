@@ -6,7 +6,7 @@ export function getSupabaseClient() {
   const supabaseUrl = process.env.SUPABASE_URL?.trim()
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
 
-  if (!supabaseUrl || !serviceRoleKey) {
+  if (!supabaseUrl || !serviceRoleKey || /^(PASTE_SERVER_ONLY_SERVICE_ROLE_KEY_HERE|your-service-role-key)$/i.test(serviceRoleKey)) {
     throw new Error('Set both SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY before using Supabase.')
   }
 

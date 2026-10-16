@@ -2,13 +2,13 @@
   "name": "Supremacy War Room",
   "short_name": "War Room",
   "description": "Share strategies and tactical playbooks for Supremacy: World War 3.",
-  "start_url": "/",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#020817",
   "theme_color": "#111827",
   "icons": [
     {
-      "src": "/favicon.svg",
+      "src": "./favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
