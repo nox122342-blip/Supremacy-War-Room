@@ -13,6 +13,7 @@ internal static class DesktopBootstrapper
 {
     private const string ReleaseApi = "https://api.github.com/repos/nox122342-blip/Supremacy-War-Room/releases/latest";
     private const string AssetName = "Supremacy War Room Full Setup.exe";
+    private const string NormalizedAssetName = "Supremacy.War.Room.Full.Setup.exe";
     private const string DownloadPrefix = "https://github.com/nox122342-blip/Supremacy-War-Room/releases/download/";
 
     private sealed class ReleaseAsset
@@ -120,7 +121,8 @@ internal static class DesktopBootstrapper
         foreach (object rawAsset in assets)
         {
             Dictionary<string, object> asset = rawAsset as Dictionary<string, object>;
-            if (asset == null || GetString(asset, "name") != AssetName)
+            string assetName = asset == null ? null : GetString(asset, "name");
+            if (assetName != AssetName && assetName != NormalizedAssetName)
                 continue;
 
             string digest = GetString(asset, "digest");
