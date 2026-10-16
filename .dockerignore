@@ -1,0 +1,9 @@
+node_modules
+android
+dist
+release
+data
+backend-data
+.git
+.env
+npm-debug.log*

@@ -1,0 +1,82 @@
+{
+  "name": "supremacy-strategy-app",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Strategy sharing and command planning for Supremacy: World War 3.",
+  "author": "Supremacy War Room",
+  "type": "module",
+  "main": "electron/main.mjs",
+  "scripts": {
+    "dev": "node dev.mjs",
+    "dev:api": "node server.mjs",
+    "dev:web": "vite",
+    "api:setup": "node scripts/setup-api.mjs",
+    "api:stop": "docker compose down",
+    "api:logs": "docker compose logs -f api",
+    "build": "tsc -b && vite build",
+    "android:sync": "npm run build && cap sync android",
+    "android:apk": "node android-build.mjs",
+    "android:release": "node android-build.mjs --release",
+    "desktop:exe": "npm run build && node desktop-build.mjs",
+    "lint": "oxlint",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.4.3",
+    "@capacitor/core": "^8.4.3",
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^13.0.3",
+    "express": "^5.2.1",
+    "express-session": "^1.19.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.4.3",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/express": "^5.0.6",
+    "@types/express-session": "^1.19.0",
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^6.1.1",
+    "electron": "^44.5.1",
+    "electron-builder": "^26.5.0",
+    "oxlint": "^1.81.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.3.0"
+  },
+  "allowScripts": {
+    "better-sqlite3@13.0.3": true,
+    "electron-winstaller@5.4.0": true
+  },
+  "build": {
+    "appId": "com.supremacywarroom.desktop",
+    "productName": "Supremacy War Room",
+    "directories": {
+      "output": "release"
+    },
+    "npmRebuild": false,
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}
