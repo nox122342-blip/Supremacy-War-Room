@@ -1,14 +1,14 @@
 {
   "name": "supremacy-strategy-app",
   "private": true,
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Strategy sharing and command planning for Supremacy: World War 3.",
   "author": "Supremacy War Room",
   "type": "module",
   "main": "electron/main.mjs",
   "scripts": {
-    "dev": "node dev.mjs",
-    "dev:api": "node server.mjs",
+    "dev": "node --env-file-if-exists=.env dev.mjs",
+    "dev:api": "node --env-file-if-exists=.env server.mjs",
     "dev:web": "vite",
     "api:setup": "node scripts/setup-api.mjs",
     "api:stop": "docker compose down",
@@ -24,8 +24,8 @@
   "dependencies": {
     "@capacitor/android": "^8.4.3",
     "@capacitor/core": "^8.4.3",
+    "@supabase/supabase-js": "^2.118.0",
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^13.0.3",
     "express": "^5.2.1",
     "express-session": "^1.19.0",
     "react": "^19.2.8",
@@ -33,7 +33,6 @@
   },
   "devDependencies": {
     "@capacitor/cli": "^8.4.3",
-    "@types/better-sqlite3": "^9.6.0",
     "@types/express": "^5.0.6",
     "@types/express-session": "^1.19.0",
     "@types/node": "^24.13.3",

@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
-import { access, writeFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { createInterface } from 'node:readline/promises'
 import { spawn } from 'node:child_process'
 import { stdin, stdout } from 'node:process'
@@ -20,18 +20,38 @@ if (composeCheck.error || composeCheck.status !== 0) {
   process.exit(1)
 }
 
+let envFile
 try {
-  await access(envPath)
-  console.error('.env already exists; leaving it unchanged. Edit it to update API configuration.')
-  process.exit(1)
+  envFile = await readFile(envPath, 'utf8')
 } catch (error) {
   if (error.code !== 'ENOENT') throw error
+  envFile = [
+    'SESSION_SECRET=',
+    'CORS_ORIGINS=',
+    'API_PORT=3001',
+    'SUPABASE_URL=https://ckgkfvylkaiyladbxqfp.supabase.co',
+    'SUPABASE_SERVICE_ROLE_KEY=',
+    '',
+  ].join('\n')
+}
+
+function getEnvValue(key) {
+  const line = envFile.split(/\r?\n/).find((entry) => entry.startsWith(`${key}=`))
+  return line ? line.slice(key.length + 1).trim().replace(/^(['"])(.*)\1$/, '$2') : ''
+}
+
+function setEnvValue(key, value) {
+  const line = `${key}=${value}`
+  const expression = new RegExp(`^${key}=.*$`, 'm')
+  envFile = expression.test(envFile)
+    ? envFile.replace(expression, line)
+    : `${envFile.trimEnd()}\n${line}\n`
 }
 
 const prompt = createInterface({ input: stdin, output: stdout })
 let webOrigin
 try {
-  webOrigin = (await prompt.question('Optional hosted website origin (for example https://warroom.example.com): ')).trim()
+  webOrigin = (await prompt.question('Optional hosted website origin (Enter to keep current CORS settings): ')).trim()
 } finally {
   prompt.close()
 }
@@ -50,16 +70,27 @@ if (webOrigin) {
   }
 }
 
-const sessionSecret = randomBytes(48).toString('hex')
-const envFile = [
-  `SESSION_SECRET=${sessionSecret}`,
-  `CORS_ORIGINS=${webOrigin}`,
-  'API_PORT=3001',
-  '',
-].join('\n')
-await writeFile(envPath, envFile, { flag: 'wx', mode: 0o600 })
-console.log('Created .env with a new secure session secret.')
-console.log('Building and starting the API. The SQLite database will be stored in backend-data/.')
+if (getEnvValue('SESSION_SECRET').length < 32 || getEnvValue('SESSION_SECRET').startsWith('replace-with-')) {
+  setEnvValue('SESSION_SECRET', randomBytes(48).toString('hex'))
+}
+if (!getEnvValue('API_PORT')) setEnvValue('API_PORT', '3001')
+if (webOrigin) {
+  const origins = getEnvValue('CORS_ORIGINS').split(',').map((origin) => origin.trim()).filter(Boolean)
+  if (!origins.includes(webOrigin)) origins.push(webOrigin)
+  setEnvValue('CORS_ORIGINS', origins.join(','))
+}
+
+const supabaseUrl = getEnvValue('SUPABASE_URL')
+const serviceRoleKey = getEnvValue('SUPABASE_SERVICE_ROLE_KEY')
+const missingSupabaseConfig = !supabaseUrl || !serviceRoleKey || /your-project|your-service-role-key/i.test(`${supabaseUrl} ${serviceRoleKey}`)
+await writeFile(envPath, envFile, { mode: 0o600 })
+if (missingSupabaseConfig) {
+  console.error('Saved .env with a secure session secret. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env, then run npm run api:setup again.')
+  process.exit(1)
+}
+
+console.log('Saved API settings in .env. The Supabase service-role key remains server-side.')
+console.log('Building and starting the API.')
 
 const docker = spawn('docker', ['compose', 'up', '--build', '-d'], {
   cwd: root,
