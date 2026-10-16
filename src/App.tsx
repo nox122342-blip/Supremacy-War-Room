@@ -329,12 +329,15 @@ function readLocalList<T>(key: string): T[] {
   }
 }
 
+const defaultApiBaseUrl = (
+  import.meta.env.VITE_API_URL?.trim() ||
+  (import.meta.env.PROD ? 'https://ckgkfvylkaiyladbxqfp.supabase.co/functions/v1' : '')
+).replace(/\/+$/, '').replace(/\/api$/, '')
+
 function getApiUrl() {
   const configuredUrl = localStorage.getItem('supremacy.apiUrl')?.trim()
-  if (configuredUrl) return `${configuredUrl.replace(/\/+$/, '')}/api`
-  const publicApiUrl = import.meta.env.VITE_API_URL?.trim() ||
-    (import.meta.env.PROD ? 'https://ckgkfvylkaiyladbxqfp.supabase.co/functions/v1' : '')
-  return publicApiUrl ? `${publicApiUrl.replace(/\/+$/, '')}/api` : '/api'
+  const baseUrl = configuredUrl || defaultApiBaseUrl
+  return baseUrl ? `${baseUrl.replace(/\/+$/, '').replace(/\/api$/, '')}/api` : '/api'
 }
 
 async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -410,7 +413,7 @@ function App() {
   const [userQuery, setUserQuery] = useState('')
   const [userResults, setUserResults] = useState<User[]>([])
   const [menuOpen, setMenuOpen] = useState(false)
-  const [serverDraft, setServerDraft] = useState(() => localStorage.getItem('supremacy.apiUrl') || '')
+  const [serverDraft, setServerDraft] = useState(() => localStorage.getItem('supremacy.apiUrl') || defaultApiBaseUrl)
   const [configuredServer, setConfiguredServer] = useState(() => localStorage.getItem('supremacy.apiUrl') || '')
   const feedRequestVersion = useRef(0)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -712,8 +715,13 @@ function App() {
     if (candidate) {
       try {
         const url = new URL(candidate)
+        const defaultUrl = defaultApiBaseUrl ? new URL(defaultApiBaseUrl) : null
+        const isDefaultApiUrl = defaultUrl &&
+          url.origin === defaultUrl.origin &&
+          url.pathname.replace(/\/+$/, '') === defaultUrl.pathname.replace(/\/+$/, '')
         if ((url.protocol !== 'https:' && url.hostname !== 'localhost' && url.hostname !== '127.0.0.1') ||
-          url.username || url.password || url.search || url.hash || (url.pathname !== '/' && url.pathname !== '/api')) {
+          url.username || url.password || url.search || url.hash ||
+          (url.pathname !== '/' && url.pathname !== '/api' && !isDefaultApiUrl)) {
           throw new Error('Use an HTTPS server URL, such as https://war-room.example.com.')
         }
       } catch (validationError) {
@@ -1002,7 +1010,7 @@ function App() {
                 <form className="dropdown-section dropdown-server-form" onSubmit={saveServerUrl}>
                   <p className="eyebrow">Connection</p>
                   <label className="search-field" htmlFor="api-server-url">
-                    <span>Server URL</span>
+                    <span>Custom server URL (optional)</span>
                     <input
                       id="api-server-url"
                       type="url"
@@ -1015,7 +1023,9 @@ function App() {
                   <p className="muted-copy">
                     {configuredServer
                       ? `Configured: ${configuredServer}`
-                      : 'Leave blank to use the default server.'}
+                      : defaultApiBaseUrl
+                        ? `Using the built-in public server: ${defaultApiBaseUrl}`
+                        : 'Leave blank to use the local development API.'}
                   </p>
                   <div className="dropdown-button-row">
                     <button className="primary-button" type="submit">Save server</button>

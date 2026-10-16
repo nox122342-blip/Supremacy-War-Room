@@ -1,7 +1,7 @@
 {
   "name": "supremacy-strategy-app",
   "private": true,
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Strategy sharing and command planning for Supremacy: World War 3.",
   "author": "Supremacy War Room",
   "type": "module",
