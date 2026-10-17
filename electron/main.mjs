@@ -1,4 +1,4 @@
-import { app, BrowserWindow, protocol } from 'electron'
+import { app, BrowserWindow, protocol, shell } from 'electron'
 import { readFile } from 'node:fs/promises'
 import { extname, resolve, sep } from 'node:path'
 
@@ -60,6 +60,10 @@ app.whenReady().then(async () => {
         nodeIntegration: false,
         sandbox: true,
       },
+    })
+    window.webContents.setWindowOpenHandler(({ url }) => {
+      if (url.startsWith('https://github.com/')) shell.openExternal(url)
+      return { action: 'deny' }
     })
     window.loadURL('supremacy://app/')
   }

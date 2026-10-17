@@ -1,5 +1,50 @@
 import { type CSSProperties, type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { Capacitor } from '@capacitor/core'
 import './App.css'
+
+declare const __APP_VERSION__: string
+
+const RELEASES_API = 'https://api.github.com/repos/nox122342-blip/Supremacy-War-Room/releases/latest'
+const UPDATE_CHECK_INTERVAL = 6 * 60 * 60 * 1000
+
+type AppUpdate = { version: string; url: string }
+
+function parseVersion(value: string) {
+  const parts = value.replace(/^v/i, '').split('.').map((part) => Number.parseInt(part, 10))
+  return parts.length === 3 && parts.every(Number.isInteger) ? parts : null
+}
+
+function isNewerVersion(candidate: string, current: string) {
+  const next = parseVersion(candidate)
+  const now = parseVersion(current)
+  if (!next || !now) return false
+  for (let index = 0; index < 3; index += 1) {
+    if (next[index] !== now[index]) return next[index] > now[index]
+  }
+  return false
+}
+
+// Web visitors always get the newest site, so only the native apps need an installer.
+function getUpdateAssetExtension() {
+  if (Capacitor.getPlatform() === 'android') return '.apk'
+  if (window.location.protocol === 'supremacy:') return '.exe'
+  return null
+}
+
+async function fetchAvailableUpdate(): Promise<AppUpdate | null> {
+  const extension = getUpdateAssetExtension()
+  if (!extension) return null
+  const response = await fetch(RELEASES_API, { headers: { Accept: 'application/vnd.github+json' } })
+  if (!response.ok) return null
+  const release = (await response.json()) as {
+    tag_name?: string
+    assets?: { name: string; browser_download_url: string }[]
+  }
+  if (!release.tag_name || !isNewerVersion(release.tag_name, __APP_VERSION__)) return null
+  const asset = release.assets?.find((item) => item.name.toLowerCase().endsWith(extension))
+  if (!asset || !asset.browser_download_url.startsWith('https://github.com/')) return null
+  return { version: release.tag_name.replace(/^v/i, ''), url: asset.browser_download_url }
+}
 
 type StrategyCategory = 'Economy' | 'Warfare' | 'Diplomacy' | 'Logistics'
 type StrategyPhase = 'Early' | 'Mid' | 'Late'
@@ -417,6 +462,7 @@ function App() {
   const [commentsOpen, setCommentsOpen] = useState<string[]>([])
   const [commentsByStrategy, setCommentsByStrategy] = useState<Record<string, Comment[]>>({})
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({})
+  const [appUpdate, setAppUpdate] = useState<AppUpdate | null>(null)
   const [messagesOpen, setMessagesOpen] = useState(false)
   const [alliancesOpen, setAlliancesOpen] = useState(false)
   const [myAlliance, setMyAlliance] = useState<Alliance | null>(null)
@@ -605,6 +651,25 @@ function App() {
       .then(({ conversations: nextConversations }) => setConversations(nextConversations))
       .catch((requestError: unknown) => setError(requestError instanceof Error ? requestError.message : 'Could not load messages.'))
   }, [messagesOpen, user])
+
+  useEffect(() => {
+    let cancelled = false
+    const checkForUpdate = () => {
+      fetchAvailableUpdate()
+        .then((update) => {
+          if (cancelled || !update) return
+          if (localStorage.getItem('supremacy.dismissedUpdate') === update.version) return
+          setAppUpdate(update)
+        })
+        .catch(() => undefined)
+    }
+    checkForUpdate()
+    const timer = window.setInterval(checkForUpdate, UPDATE_CHECK_INTERVAL)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
+  }, [])
 
   useEffect(() => {
     if (!user || !alliancesOpen) return
@@ -1179,6 +1244,25 @@ function App() {
           </div>
         </nav>
       </header>
+
+      {appUpdate ? (
+        <div className="notice update-notice" role="status">
+          <span>Version {appUpdate.version} is available.</span>
+          <span className="update-notice-actions">
+            <a className="primary-button" href={appUpdate.url} target="_blank" rel="noopener noreferrer">Download update</a>
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => {
+                localStorage.setItem('supremacy.dismissedUpdate', appUpdate.version)
+                setAppUpdate(null)
+              }}
+            >
+              Later
+            </button>
+          </span>
+        </div>
+      ) : null}
 
       {error ? (
         <div className="notice error-notice" role="alert">

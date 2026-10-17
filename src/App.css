@@ -859,6 +859,22 @@ h3 {
   color: #fecaca;
 }
 
+.update-notice {
+  border: 1px solid rgba(34, 211, 238, 0.4);
+  background: rgba(8, 47, 73, 0.55);
+  color: #cffafe;
+}
+
+.update-notice-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.update-notice-actions a {
+  text-decoration: none;
+}
+
 .offline-notice {
   border: 1px solid rgba(250, 204, 21, 0.35);
   background: rgba(113, 63, 18, 0.32);
