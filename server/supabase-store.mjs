@@ -202,6 +202,26 @@ export function createSupabaseStore(client) {
       return mapComment(data)
     },
 
+    async deleteStrategy(id, userId) {
+      const { data, error } = await client.from('strategies')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', userId)
+        .select('id')
+      if (error) throw error
+      return data.length > 0
+    },
+
+    async deleteComment(id, userId) {
+      const { data, error } = await client.from('comments')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', userId)
+        .select('id')
+      if (error) throw error
+      return data.length > 0
+    },
+
     async searchUsers(userId, query) {
       const escapedQuery = query.replace(/[\\%_]/g, '\\$&')
       const { data, error } = await client.from('users')

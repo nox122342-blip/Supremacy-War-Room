@@ -953,6 +953,37 @@ function App() {
     }
   }
 
+  const deleteStrategy = async (strategyId: string) => {
+    if (!window.confirm('Delete this strategy and all of its comments?')) return
+    setError('')
+    try {
+      await api(`/strategies/${strategyId}`, { method: 'DELETE' })
+      setStrategies((current) => current.filter((strategy) => strategy.id !== strategyId))
+      setCommentsOpen((current) => current.filter((id) => id !== strategyId))
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Could not delete the strategy.')
+    }
+  }
+
+  const deleteComment = async (strategyId: string, commentId: string) => {
+    if (!window.confirm('Delete this comment?')) return
+    setError('')
+    try {
+      await api(`/comments/${commentId}`, { method: 'DELETE' })
+      setCommentsByStrategy((current) => ({
+        ...current,
+        [strategyId]: (current[strategyId] || []).filter((comment) => comment.id !== commentId),
+      }))
+      setStrategies((current) =>
+        current.map((strategy) =>
+          strategy.id === strategyId ? { ...strategy, commentCount: Math.max(0, strategy.commentCount - 1) } : strategy,
+        ),
+      )
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Could not delete the comment.')
+    }
+  }
+
   const openConversation = async (recipient: User) => {
     setError('')
     setConversationMessages([])
@@ -1474,6 +1505,9 @@ function App() {
                         {strategy.isLocal ? (
                           <button type="button" className="ghost-button" onClick={() => editLocalStrategy(strategy)}>Edit</button>
                         ) : null}
+                        {user && !offlineMode && !strategy.isLocal && strategy.userId === user.id ? (
+                          <button type="button" className="ghost-button" onClick={() => deleteStrategy(strategy.id)}>Delete</button>
+                        ) : null}
                         {!offlineMode ? (
                           <button
                             type="button"
@@ -1511,6 +1545,9 @@ function App() {
                             <strong>{comment.author}</strong>
                             <p>{comment.body}</p>
                             <time dateTime={comment.createdAt}>{formatDate(comment.createdAt)}</time>
+                            {user && comment.userId === user.id ? (
+                              <button type="button" className="text-button" onClick={() => deleteComment(strategy.id, comment.id)}>Delete</button>
+                            ) : null}
                           </div>
                         )) : <p className="muted-copy">No comments yet. Start the discussion.</p>}
                         {user ? (

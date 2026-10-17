@@ -404,6 +404,30 @@ export function createApi({ client = getSupabaseClient() } = {}) {
     }
   })
 
+  app.delete('/api/strategies/:id', requireAuth, async (req, res, next) => {
+    try {
+      if (!UUID_PATTERN.test(req.params.id) || !await store.deleteStrategy(req.params.id, req.session.userId)) {
+        res.status(404).json({ error: 'Strategy not found.' })
+        return
+      }
+      res.status(204).end()
+    } catch (error) {
+      next(error)
+    }
+  })
+
+  app.delete('/api/comments/:id', requireAuth, async (req, res, next) => {
+    try {
+      if (!UUID_PATTERN.test(req.params.id) || !await store.deleteComment(req.params.id, req.session.userId)) {
+        res.status(404).json({ error: 'Comment not found.' })
+        return
+      }
+      res.status(204).end()
+    } catch (error) {
+      next(error)
+    }
+  })
+
   app.get('/api/users', requireAuth, async (req, res, next) => {
     try {
       const query = typeof req.query.query === 'string' ? req.query.query.trim() : ''

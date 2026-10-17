@@ -379,6 +379,18 @@ async function handle(request: Request, origin?: string) {
     return new Response(null, { status: 204, headers: origin ? { "Access-Control-Allow-Origin": origin, "Vary": "Origin" } : {} });
   }
 
+  const ownedDelete = endpoint.match(/^\/(strategies|comments)\/([^/]+)$/);
+  if (method === "DELETE" && ownedDelete) {
+    if (!currentUser) return json({ error: "Sign in to continue." }, 401, origin);
+    const label = ownedDelete[1] === "strategies" ? "Strategy" : "Comment";
+    if (!uuidPattern.test(ownedDelete[2])) return json({ error: `${label} not found.` }, 404, origin);
+    const { data, error } = await db.from(ownedDelete[1]).delete()
+      .eq("id", ownedDelete[2]).eq("user_id", currentUser).select("id");
+    if (error) throw error;
+    if (!data.length) return json({ error: `${label} not found.` }, 404, origin);
+    return new Response(null, { status: 204, headers: origin ? { "Access-Control-Allow-Origin": origin, "Vary": "Origin" } : {} });
+  }
+
   const commentsMatch = endpoint.match(/^\/strategies\/([^/]+)\/comments$/);
   if (commentsMatch && (method === "GET" || method === "POST")) {
     const strategyId = commentsMatch[1];
