@@ -11,6 +11,9 @@ Supremacy War Room is a strategy-sharing and command-planning app for **Supremac
 - **Interactive map** – every strategy is placed on a globe/world map by theatre (North America, South America, Europe, Middle East, Africa, Asia-Pacific, or Global).
 - **Comments** – discuss any strategy with other commanders.
 - **Private messages** – send one-to-one messages to other registered users, with unread counts.
+- **Alliances** – create or join an alliance (up to 128 members).
+- **Manage your content** – delete your own strategies and comments.
+- **Update notifications** – the app tells you when a newer release is available.
 - **High-priority targets** – keep up to 10 personal targets per account.
 - **Accounts** – register and sign in with a username and password. Passwords are hashed with bcrypt, and sign-in attempts are rate limited.
 - **Offline mode** – if the server is unreachable, you can still write private strategy drafts and targets, which are saved on your device.
