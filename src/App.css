@@ -41,7 +41,7 @@
   transform: perspective(720px) rotateX(59deg);
   transform-origin: center top;
   mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.72) 20%, #000 82%, transparent 100%);
-  animation: tactical-grid-drift 32s linear infinite;
+  animation: tactical-grid-drift 32s steps(96) infinite;
 }
 
 .app-shell::after {

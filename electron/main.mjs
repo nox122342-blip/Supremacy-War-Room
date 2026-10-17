@@ -25,7 +25,18 @@ const contentTypes = {
   '.webmanifest': 'application/manifest+json',
 }
 
+const hasInstanceLock = app.requestSingleInstanceLock()
+if (!hasInstanceLock) app.quit()
+
+app.on('second-instance', () => {
+  const [window] = BrowserWindow.getAllWindows()
+  if (!window) return
+  if (window.isMinimized()) window.restore()
+  window.focus()
+})
+
 app.whenReady().then(async () => {
+  if (!hasInstanceLock) return
   const staticRoot = resolve(app.getAppPath(), 'dist')
 
   protocol.handle('supremacy', async (request) => {
@@ -55,12 +66,15 @@ app.whenReady().then(async () => {
       minWidth: 360,
       minHeight: 640,
       backgroundColor: '#020817',
+      show: false,
       webPreferences: {
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: true,
+        spellcheck: false,
       },
     })
+    window.once('ready-to-show', () => window.show())
     window.webContents.setWindowOpenHandler(({ url }) => {
       if (url.startsWith('https://github.com/')) shell.openExternal(url)
       return { action: 'deny' }

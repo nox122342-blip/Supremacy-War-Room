@@ -281,7 +281,7 @@ function SpinningGlobeMap() {
     const drawFrame = (time: number) => {
       if (disposed) return
       const bounds = canvas.getBoundingClientRect()
-      const pixelRatio = Math.min(window.devicePixelRatio || 1, 2)
+      const pixelRatio = Math.min(window.devicePixelRatio || 1, 1.5)
       const width = Math.max(1, Math.round(bounds.width * pixelRatio))
       const height = Math.max(1, Math.round(bounds.height * pixelRatio))
       if (canvas.width !== width || canvas.height !== height) {
@@ -299,8 +299,13 @@ function SpinningGlobeMap() {
       }
     }
 
+    let lastDrawTime = 0
     const animate = (time: number) => {
-      drawFrame(time)
+      // The globe turns once per 24 seconds, so 30 fps looks identical at half the GPU work.
+      if (time - lastDrawTime >= 32) {
+        lastDrawTime = time
+        drawFrame(time)
+      }
       if (!motionPreference.matches && !document.hidden) {
         animationFrame = window.requestAnimationFrame(animate)
       }
@@ -341,10 +346,15 @@ function SpinningGlobeMap() {
       updateAnimation()
     }
     image.onerror = () => console.error('Could not load the globe map texture.')
-    image.src = `${import.meta.env.BASE_URL}globe-map.svg`
+    // Start loading the texture only once the first screen has been drawn.
+    const startLoading = () => {
+      if (!disposed) image.src = `${import.meta.env.BASE_URL}globe-map.svg`
+    }
+    const idleHandle = window.setTimeout(startLoading, 250)
 
     return () => {
       disposed = true
+      window.clearTimeout(idleHandle)
       if (animationFrame !== undefined) window.cancelAnimationFrame(animationFrame)
       resizeObserver.disconnect()
       motionPreference.removeEventListener('change', updateAnimation)
@@ -655,6 +665,7 @@ function App() {
   useEffect(() => {
     let cancelled = false
     const checkForUpdate = () => {
+      if (document.hidden) return
       fetchAvailableUpdate()
         .then((update) => {
           if (cancelled || !update) return
@@ -663,10 +674,12 @@ function App() {
         })
         .catch(() => undefined)
     }
-    checkForUpdate()
+    // Wait until the feed has had time to load before spending a request on the update check.
+    const firstCheck = window.setTimeout(checkForUpdate, 8000)
     const timer = window.setInterval(checkForUpdate, UPDATE_CHECK_INTERVAL)
     return () => {
       cancelled = true
+      window.clearTimeout(firstCheck)
       window.clearInterval(timer)
     }
   }, [])
